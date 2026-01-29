@@ -67,6 +67,11 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
   const bgLoadedRef = useRef(false);
   const cameraX = useRef(0);
   const timeRef = useRef(0);
+  const lastTimeRef = useRef(performance.now());
+  const fpsRef = useRef(fps);
+
+  // Sync fpsRef immediately during render (not in useEffect which runs async)
+  fpsRef.current = fps;
 
   const WORLD_WIDTH = 800;
   const WORLD_HEIGHT = 400;
@@ -176,12 +181,18 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
 
+    // Calculate delta time for frame-rate independent animation
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - lastTimeRef.current) / 1000; // Convert to seconds
+    lastTimeRef.current = currentTime;
+
     const state = characterState.current;
     const walkImages = walkImagesRef.current;
     const jumpImages = jumpImagesRef.current;
     const attackImages = attackImagesRef.current;
     const bgLayers = bgLayersRef.current;
-    timeRef.current++;
+    // Accumulate time in seconds (not frames) for frame-rate independent effects
+    timeRef.current += deltaTime;
 
     // Clear
     ctx.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -191,27 +202,31 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
     state.isWalking = movingHorizontally && !state.isJumping && !state.isAttacking;
 
     // Handle horizontal movement (works both on ground and in air, but not during ground attack)
+    // Movement speed normalized to 60 FPS for frame-rate independence
     const canMove = !state.isAttacking || state.isJumping; // Can move during air attack
+    const moveAmount = MOVE_SPEED * deltaTime * 60;
     if (canMove) {
       if (keysPressed.current.has("right")) {
         state.direction = "right";
-        state.x += MOVE_SPEED;
-        cameraX.current += MOVE_SPEED;
+        state.x += moveAmount;
+        cameraX.current += moveAmount;
       }
       if (keysPressed.current.has("left")) {
         state.direction = "left";
-        state.x -= MOVE_SPEED;
-        cameraX.current -= MOVE_SPEED;
+        state.x -= moveAmount;
+        cameraX.current -= moveAmount;
       }
     }
 
     state.x = Math.max(50, Math.min(WORLD_WIDTH - 50, state.x));
 
-    // Jump physics
+    // Jump physics - normalized for frame-rate independence
+    // Physics constants were tuned for 60 FPS, so we scale by deltaTime * 60
     if (state.isJumping) {
-      state.velocityY += GRAVITY;
-      state.y += state.velocityY;
-      
+      const physicsScale = deltaTime * 60;
+      state.velocityY += GRAVITY * physicsScale;
+      state.y += state.velocityY * physicsScale;
+
       if (state.y >= 0) {
         state.y = 0;
         state.velocityY = 0;
@@ -248,11 +263,15 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
       ctx.fillText("Loading...", WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     }
 
-    // Walk animation
+    // Read current FPS from ref (so we always get the latest value)
+    const currentFps = fpsRef.current;
+
+    // Walk animation - using delta time for frame-rate independence
     if (state.isWalking && walkImages.length > 0) {
-      state.frameTime += 1;
-      if (state.frameTime >= 60 / fps) {
-        state.frameTime = 0;
+      state.frameTime += deltaTime;
+      const frameDuration = 1 / currentFps; // Time per frame in seconds
+      if (state.frameTime >= frameDuration) {
+        state.frameTime -= frameDuration;
         state.walkFrameIndex = (state.walkFrameIndex + 1) % walkImages.length;
       }
     } else if (!state.isJumping && !state.isAttacking) {
@@ -260,22 +279,24 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
       state.frameTime = 0;
     }
 
-    // Jump animation
+    // Jump animation - using delta time for frame-rate independence
     if (state.isJumping && jumpImages.length > 0 && !state.isAttacking) {
-      state.jumpFrameTime += 1;
-      if (state.jumpFrameTime >= 60 / (fps * 0.8)) {
-        state.jumpFrameTime = 0;
+      state.jumpFrameTime += deltaTime;
+      const jumpFrameDuration = 1 / (currentFps * 0.8); // Slightly slower than walk
+      if (state.jumpFrameTime >= jumpFrameDuration) {
+        state.jumpFrameTime -= jumpFrameDuration;
         if (state.jumpFrameIndex < jumpImages.length - 1) {
           state.jumpFrameIndex++;
         }
       }
     }
 
-    // Attack animation - plays once then stops
+    // Attack animation - plays once then stops, using delta time for frame-rate independence
     if (state.isAttacking && attackImages.length > 0) {
-      state.attackFrameTime += 1;
-      if (state.attackFrameTime >= 60 / (fps * 1.2)) { // Slightly faster for attack
-        state.attackFrameTime = 0;
+      state.attackFrameTime += deltaTime;
+      const attackFrameDuration = 1 / (currentFps * 1.2); // Slightly faster for attack
+      if (state.attackFrameTime >= attackFrameDuration) {
+        state.attackFrameTime -= attackFrameDuration;
         state.attackFrameIndex++;
         
         // Attack finished
@@ -334,7 +355,8 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
       const feetY = (contentBounds.y + contentBounds.height) * scale; // Bottom of content in scaled coordinates
       
       // Only add bob when walking on ground
-      const bob = state.isWalking && !state.isJumping && !state.isAttacking ? Math.sin(timeRef.current * 0.3) * 2 : 0;
+      // timeRef is now in seconds, so multiply by 18 (was 0.3 * 60fps) for same visual speed
+      const bob = state.isWalking && !state.isJumping && !state.isAttacking ? Math.sin(timeRef.current * 18) * 2 : 0;
       
       // Position so feet are at GROUND_Y
       // drawY is top-left of the sprite, so: drawY + feetY = GROUND_Y
@@ -374,7 +396,7 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
     ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, [fps]);
+  }, []);
 
   // Initialize
   useEffect(() => {
@@ -396,6 +418,7 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, fps 
     characterState.current.isJumping = false;
     characterState.current.isAttacking = false;
     cameraX.current = 0;
+    lastTimeRef.current = performance.now(); // Reset time reference
 
     animationRef.current = requestAnimationFrame(gameLoop);
 
