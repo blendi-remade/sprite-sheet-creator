@@ -7,16 +7,17 @@ fal.config({
 });
 
 const CHARACTER_STYLE_PROMPT = `Generate a single character only, centered in the frame on a plain white background.
-The character should be rendered in pixel art style with clean edges, suitable for use as a 2D game sprite.
-Use a 32-bit retro game aesthetic. The character should be shown in a front-facing or 3/4 view pose,
-standing idle and ready to be used in a sprite sheet animation.`;
+The character should be rendered in detailed 32-bit pixel art style (like PlayStation 1 / SNES era games).
+Include proper shading, highlights, and anti-aliased edges for a polished look.
+The character should have well-defined features, expressive details, and rich colors.
+Show in a front-facing or 3/4 view pose, standing idle, suitable for sprite sheet animation.`;
 
-const IMAGE_TO_PIXEL_PROMPT = `Transform this character into pixel art style.
+const IMAGE_TO_PIXEL_PROMPT = `Transform this character into detailed 32-bit pixel art style (like PlayStation 1 / SNES era games).
 IMPORTANT: Must be a FULL BODY shot showing the entire character from head to feet.
 Keep the character centered in the frame on a plain white background.
-Render in pixel art style with clean edges, suitable for use as a 2D game sprite.
-Use a 32-bit retro game aesthetic. Show the character in a front-facing or 3/4 view pose,
-standing idle and ready to be used in a sprite sheet animation.
+Include proper shading, highlights, and anti-aliased edges for a polished look.
+The character should have well-defined features, expressive details, and rich colors.
+Show in a front-facing or 3/4 view pose, standing idle, suitable for sprite sheet animation.
 Maintain the character's key features, colors, and identity while converting to pixel art.`;
 
 export async function POST(request: NextRequest) {

@@ -22,7 +22,7 @@ Frame 6: Legs very close together, passing/crossing
 
 Each frame shows a different phase of the walking motion. Stride frames have legs spread apart, passing frames have legs close together.
 
-Keep it simple like a classic 8-bit or 16-bit video game sprite. Same character design in all frames.`;
+Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames.`;
 
 const JUMP_SPRITE_PROMPT = `Create a 4-frame pixel art jump animation sprite sheet of this character.
 
@@ -36,7 +36,7 @@ Bottom row (frames 3-4):
 Frame 3 (bottom-left): Apex/peak - character at highest point of jump, body stretched or tucked
 Frame 4 (bottom-right): Landing - character landing, slight crouch to absorb impact
 
-Keep it simple like a classic 8-bit or 16-bit video game sprite. Same character design in all frames. Character facing right.`;
+Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Character facing right.`;
 
 const ATTACK_SPRITE_PROMPT = `Create a 4-frame pixel art attack animation sprite sheet of this character.
 
@@ -50,7 +50,7 @@ Bottom row (frames 3-4):
 Frame 3 (bottom-left): Impact/peak - maximum extension of attack, weapon fully swung or spell at full power
 Frame 4 (bottom-right): Recovery - returning to ready stance
 
-Keep it simple like a classic 8-bit or 16-bit video game sprite. Same character design in all frames. Character facing right. Make the attack visually dynamic and exciting.`;
+Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Character facing right. Make the attack visually dynamic and exciting.`;
 
 type SpriteType = "walk" | "jump" | "attack";
 
