@@ -1,6 +1,6 @@
 # Sprite Sheet Creator
 
-AI-powered sprite sheet generator for 2D pixel art characters. Built with [fal.ai](https://fal.ai).
+Sprite sheet generator for 2D pixel art characters. Built with [fal.ai](https://fal.ai).
 
 ## Demo
 
@@ -37,7 +37,7 @@ Generate character-specific parallax backgrounds with 3 layers:
 | **Mid** | Character's iconic location (e.g., Hidden Leaf Village for Naruto) |
 | **Foreground** | Ground layer with terrain matching the character's world |
 
-The AI uses your character image to generate backgrounds that match their style and story.
+Nano-banana-pro uses your character image to generate backgrounds that match their style and story.
 
 ## Getting Started
 
