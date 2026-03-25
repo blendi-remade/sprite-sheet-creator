@@ -13,7 +13,7 @@ This is for a character: "${characterPrompt}"
 
 Create an environment that fits this character's world. This is the FURTHEST layer - only sky and very distant elements (distant mountains, clouds, horizon).
 
-Style: Pixel art, 32-bit retro game aesthetic, matching the character's style.
+Style: Pixel art, 32-bit retro game aesthetic, matching the character's style..
 This is a wide panoramic scene.`;
 
 const LAYER2_PROMPT = `Create the MIDDLE layer of a 3-layer parallax background for a side-scrolling pixel art game.
@@ -40,12 +40,10 @@ IMPORTANT: Use a transparent background (checkerboard pattern) so this layer can
 const ISOMETRIC_MAP_PROMPT = (characterPrompt: string) =>
   `Create a large, detailed top-down isometric pixel art game world map for a character: "${characterPrompt}". Do not place the character themselves on the map.
 
-Style: Stardew Valley / Pokemon / classic RPG top-down map, 3/4 overhead perspective.
+Style: Classic RPG top-down map, 3/4 overhead perspective.
 
 The map should include a cohesive world with:
 - Winding dirt/stone paths connecting areas
-- Grassy fields and meadows
-- Trees, bushes, and flowers
 - A small body of water (pond, river, or stream)
 - A few small buildings or structures that fit the character's world
 - Rocky areas or hills

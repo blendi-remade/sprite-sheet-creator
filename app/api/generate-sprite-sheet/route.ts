@@ -67,7 +67,7 @@ Keep movements SUBTLE - this is a gentle breathing/idle loop, not dramatic motio
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Character facing right.`;
 
 // Isometric (top-down RPG) sprite prompts
-const WALK_DOWN_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character walking DOWNWARD (toward the camera) in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const WALK_DOWN_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character walking DOWNWARD (toward the camera) in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 Arrange the 4 frames in a 2x2 grid on white background. The character is walking toward the viewer (south/down).
 
@@ -83,23 +83,23 @@ We see the character's front/face. Top-down 3/4 view - we see the top of their h
 
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames.`;
 
-const WALK_UP_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character walking UPWARD (away from the camera) in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const WALK_UP_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character walking UPWARD (away from the camera) in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 Arrange the 4 frames in a 2x2 grid on white background. The character is walking away from the viewer (north/up).
 
 Top row (frames 1-2):
-Frame 1 (top-left): Left foot forward stride, arms swinging naturally
-Frame 2 (top-right): Feet together, passing/transition pose
+Frame 1 (top-left): Left foot forward stride, arms swinging naturally — BACK VIEW
+Frame 2 (top-right): Feet together, passing/transition pose — BACK VIEW
 
 Bottom row (frames 3-4):
-Frame 3 (bottom-left): Right foot forward stride, arms swinging naturally
-Frame 4 (bottom-right): Feet together, passing/transition back
+Frame 3 (bottom-left): Right foot forward stride, arms swinging naturally — BACK VIEW
+Frame 4 (bottom-right): Feet together, passing/transition back — BACK VIEW
 
-We see the character's back. Top-down 3/4 view - we see the top of their head and back. This creates a smooth looping walk cycle.
+CRITICAL: ALL 4 frames must show the character from EXACTLY the same angle — their BACK, facing directly away from the camera. Do NOT rotate or twist the character between frames. The ONLY difference between frames should be the leg and arm positions for the walk cycle. The character's body angle, head direction, and facing must be IDENTICAL in every frame — always showing the back of the character. A simple back view with only legs alternating.
 
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames.`;
 
-const WALK_SIDE_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character WALKING TO THE RIGHT in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const WALK_SIDE_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character WALKING TO THE RIGHT in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 Arrange the 4 frames in a 2x2 grid on white background. The character is FACING RIGHT and WALKING RIGHT.
 
@@ -116,7 +116,7 @@ We see the character's RIGHT-facing side profile from a top-down 3/4 overhead an
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Character facing RIGHT.`;
 
 // Isometric attack prompts
-const ATTACK_DOWN_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking DOWNWARD (toward the camera) in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const ATTACK_DOWN_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking DOWNWARD (toward the camera) in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 Arrange the 4 frames in a 2x2 grid on white background. The character is facing toward the viewer (south/down) and performing an attack.
 
@@ -132,7 +132,7 @@ We see the character's front/face. Top-down 3/4 view. The attack should fit the 
 
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Make the attack visually dynamic.`;
 
-const ATTACK_UP_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking UPWARD (away from the camera) in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const ATTACK_UP_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking UPWARD (away from the camera) in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 I've also sent you a reference of the same character's front-facing attack. Use the EXACT SAME attack type, weapon, and visual effects - just show it from behind.
 
@@ -150,7 +150,7 @@ We see the character's back. Top-down 3/4 view. MUST use the same attack style a
 
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames.`;
 
-const ATTACK_SIDE_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking SIDEWAYS (to the right) in a top-down isometric RPG perspective (3/4 overhead view, like Stardew Valley or Pokemon).
+const ATTACK_SIDE_SPRITE_PROMPT = `Create a 4-frame pixel art ATTACK animation sprite sheet of this character attacking SIDEWAYS (to the right) in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
 
 I've also sent you a reference of the same character's front-facing attack. Use the EXACT SAME attack type, weapon, and visual effects - just show it from the side profile.
 
@@ -168,7 +168,23 @@ IMPORTANT: Show the character's SIDE PROFILE facing RIGHT. Top-down 3/4 overhead
 
 Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. Character facing RIGHT.`;
 
-type SpriteType = "walk" | "jump" | "attack" | "idle" | "walk-down" | "walk-up" | "walk-side" | "attack-down" | "attack-up" | "attack-side";
+const IDLE_ISO_SPRITE_PROMPT = `Create a 4-frame pixel art idle/breathing animation sprite sheet of this character in a top-down isometric RPG perspective (3/4 overhead view, like a classic top-down RPG).
+
+Arrange the 4 frames in a 2x2 grid on white background. The character is FACING TOWARD THE CAMERA (south/down) and standing still with a subtle idle animation.
+
+Top row (frames 1-2):
+Frame 1 (top-left): Neutral standing pose - relaxed stance, facing down/toward viewer
+Frame 2 (top-right): Slight inhale - body rises subtly, maybe slight arm movement
+
+Bottom row (frames 3-4):
+Frame 3 (bottom-left): Full breath - slight upward posture
+Frame 4 (bottom-right): Exhale - returning to neutral, slight settle
+
+Keep movements SUBTLE - this is a gentle breathing/idle loop, not dramatic motion. Character should look alive but relaxed. We see the character's front/face from a top-down 3/4 overhead angle.
+
+Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames.`;
+
+type SpriteType = "walk" | "jump" | "attack" | "idle" | "walk-down" | "walk-up" | "walk-side" | "attack-down" | "attack-up" | "attack-side" | "idle-iso";
 
 const PROMPTS: Record<SpriteType, string> = {
   walk: WALK_SPRITE_PROMPT,
@@ -181,6 +197,7 @@ const PROMPTS: Record<SpriteType, string> = {
   "attack-down": ATTACK_DOWN_SPRITE_PROMPT,
   "attack-up": ATTACK_UP_SPRITE_PROMPT,
   "attack-side": ATTACK_SIDE_SPRITE_PROMPT,
+  "idle-iso": IDLE_ISO_SPRITE_PROMPT,
 };
 
 const ASPECT_RATIOS: Record<SpriteType, string> = {
@@ -191,9 +208,10 @@ const ASPECT_RATIOS: Record<SpriteType, string> = {
   "walk-down": "1:1",
   "walk-up": "1:1",
   "walk-side": "1:1",
-  "attack-down": "1:1",
-  "attack-up": "1:1",
-  "attack-side": "1:1",
+  "attack-down": "9:16",
+  "attack-up": "9:16",
+  "attack-side": "16:9",
+  "idle-iso": "1:1",
 };
 
 export async function POST(request: NextRequest) {

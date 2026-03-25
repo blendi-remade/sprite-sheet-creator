@@ -169,6 +169,12 @@ export default function Home() {
   // Isometric map
   const [isometricMapUrl, setIsometricMapUrl] = useState<string | null>(null);
 
+  // Isometric idle sprite (front-facing)
+  const [isoIdleUrl, setIsoIdleUrl] = useState<string | null>(null);
+  const [isoIdleBgUrl, setIsoIdleBgUrl] = useState<string | null>(null);
+  const [isoIdleFrames, setIsoIdleFrames] = useState<Frame[]>([]);
+  const [isoIdleDimensions, setIsoIdleDimensions] = useState({ width: 0, height: 0 });
+
   // Isometric attack sprites (3 directions: down, up, side — right is flipped side)
   const [isoAttackDownUrl, setIsoAttackDownUrl] = useState<string | null>(null);
   const [isoAttackUpUrl, setIsoAttackUpUrl] = useState<string | null>(null);
@@ -331,6 +337,10 @@ export default function Home() {
     if (isoAttackSideBgUrl) autoExtractFrames(isoAttackSideBgUrl, setIsoAttackSideFrames, setIsoAttackSideDimensions);
   }, [isoAttackSideBgUrl, autoExtractFrames]);
 
+  useEffect(() => {
+    if (isoIdleBgUrl) autoExtractFrames(isoIdleBgUrl, setIsoIdleFrames, setIsoIdleDimensions);
+  }, [isoIdleBgUrl, autoExtractFrames]);
+
   // Animation loop (uses walk frames for preview)
   useEffect(() => {
     if (!isPlaying || walkExtractedFrames.length === 0) return;
@@ -462,8 +472,8 @@ export default function Home() {
 
     try {
       if (gameMode === "isometric") {
-        // Phase 1: Generate 3 walk directions + attack-down in parallel
-        const [downResponse, upResponse, sideResponse, atkDownResponse] = await Promise.all([
+        // Phase 1: Generate 3 walk directions + attack-down + idle in parallel
+        const [downResponse, upResponse, sideResponse, atkDownResponse, idleIsoResponse] = await Promise.all([
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -484,17 +494,24 @@ export default function Home() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ characterImageUrl, type: "attack-down" }),
           }),
+          fetch("/api/generate-sprite-sheet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ characterImageUrl, type: "idle-iso" }),
+          }),
         ]);
 
         const downData = await downResponse.json();
         const upData = await upResponse.json();
         const sideData = await sideResponse.json();
         const atkDownData = await atkDownResponse.json();
+        const idleIsoData = await idleIsoResponse.json();
 
         if (!downResponse.ok) throw new Error(downData.error || "Failed to generate walk-down sprite sheet");
         if (!upResponse.ok) throw new Error(upData.error || "Failed to generate walk-up sprite sheet");
         if (!sideResponse.ok) throw new Error(sideData.error || "Failed to generate walk-side sprite sheet");
         if (!atkDownResponse.ok) throw new Error(atkDownData.error || "Failed to generate attack-down sprite sheet");
+        if (!idleIsoResponse.ok) throw new Error(idleIsoData.error || "Failed to generate idle sprite sheet");
 
         // Walk slots: walk=down, jump=up, attack=side(left), idle=side(right, flipped in sandbox)
         setWalkSpriteSheetUrl(downData.imageUrl);
@@ -502,6 +519,7 @@ export default function Home() {
         setAttackSpriteSheetUrl(sideData.imageUrl);
         setIdleSpriteSheetUrl(sideData.imageUrl);
         setIsoAttackDownUrl(atkDownData.imageUrl);
+        setIsoIdleUrl(idleIsoData.imageUrl);
 
         // Phase 2: Generate attack-up and attack-side using attack-down as reference for consistency
         const [atkUpResponse, atkSideResponse] = await Promise.all([
@@ -674,8 +692,8 @@ export default function Home() {
       const bgRemovalUrls = [walkSpriteSheetUrl, jumpSpriteSheetUrl, attackSpriteSheetUrl, idleSpriteSheetUrl];
 
       // In isometric mode, also remove bg from attack sheets
-      if (gameMode === "isometric" && isoAttackDownUrl && isoAttackUpUrl && isoAttackSideUrl) {
-        bgRemovalUrls.push(isoAttackDownUrl, isoAttackUpUrl, isoAttackSideUrl);
+      if (gameMode === "isometric" && isoAttackDownUrl && isoAttackUpUrl && isoAttackSideUrl && isoIdleUrl) {
+        bgRemovalUrls.push(isoAttackDownUrl, isoAttackUpUrl, isoAttackSideUrl, isoIdleUrl);
       }
 
       const responses = await Promise.all(
@@ -706,10 +724,11 @@ export default function Home() {
       setIdleSpriteSheetDimensions({ width: results[3].width, height: results[3].height });
 
       // Set isometric attack bg removed URLs
-      if (gameMode === "isometric" && results.length >= 7) {
+      if (gameMode === "isometric" && results.length >= 8) {
         setIsoAttackDownBgUrl(results[4].imageUrl);
         setIsoAttackUpBgUrl(results[5].imageUrl);
         setIsoAttackSideBgUrl(results[6].imageUrl);
+        setIsoIdleBgUrl(results[7].imageUrl);
       }
 
       setCompletedSteps((prev) => new Set([...prev, 2]));
@@ -1635,6 +1654,37 @@ export default function Home() {
                 Walk Left is auto-flipped from Walk Right.
               </p>
 
+              {/* Idle sheet */}
+              <h4 style={{ marginBottom: "0.5rem", color: "var(--text-secondary)", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Idle Sprite</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
+                <div>
+                  <h4 style={{ marginBottom: "0.5rem", color: "var(--text-secondary)", fontSize: "0.85rem" }}>Idle</h4>
+                  {isoIdleUrl && (
+                    <div className="image-preview" style={{ margin: 0, opacity: regeneratingSpriteSheet === "idle-iso" ? 0.5 : 1 }}>
+                      <img src={isoIdleUrl} alt="Idle sprite sheet" />
+                    </div>
+                  )}
+                  <button
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      if (!characterImageUrl) return;
+                      setRegeneratingSpriteSheet("idle-iso");
+                      try {
+                        const res = await fetch("/api/generate-sprite-sheet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterImageUrl, type: "idle-iso" }) });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        setIsoIdleUrl(data.imageUrl);
+                      } catch (err) { setError(err instanceof Error ? err.message : "Failed to regenerate idle"); }
+                      finally { setRegeneratingSpriteSheet(null); }
+                    }}
+                    disabled={isGeneratingSpriteSheet || regeneratingSpriteSheet !== null || isRemovingBg}
+                    style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", marginTop: "0.5rem", width: "100%" }}
+                  >
+                    {regeneratingSpriteSheet === "idle-iso" ? "Regenerating..." : "Regen"}
+                  </button>
+                </div>
+              </div>
+
               {/* Attack sheets */}
               <h4 style={{ marginBottom: "0.5rem", color: "var(--text-secondary)", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Attack Sprites</h4>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "0.5rem" }}>
@@ -1716,7 +1766,7 @@ export default function Home() {
             <button
               className="btn btn-success"
               onClick={removeBackground}
-              disabled={isRemovingBg || isGeneratingSpriteSheet || !walkSpriteSheetUrl || !jumpSpriteSheetUrl || !attackSpriteSheetUrl || (gameMode === "isometric" && (!isoAttackDownUrl || !isoAttackUpUrl || !isoAttackSideUrl))}
+              disabled={isRemovingBg || isGeneratingSpriteSheet || !walkSpriteSheetUrl || !jumpSpriteSheetUrl || !attackSpriteSheetUrl || (gameMode === "isometric" && (!isoAttackDownUrl || !isoAttackUpUrl || !isoAttackSideUrl || !isoIdleUrl))}
             >
               {isRemovingBg ? "Removing Backgrounds..." : "Remove Backgrounds →"}
             </button>
@@ -1761,6 +1811,7 @@ export default function Home() {
               { label: "Attack Down", url: isoAttackDownBgUrl },
               { label: "Attack Up", url: isoAttackUpBgUrl },
               { label: "Attack Side", url: isoAttackSideBgUrl },
+              { label: "Idle", url: isoIdleBgUrl },
             ]).map(({ label, url }) => (
               <div key={label}>
                 <h4 style={{ marginBottom: "0.5rem", color: "var(--text-secondary)", fontSize: "0.85rem" }}>{label}</h4>
@@ -2201,6 +2252,7 @@ export default function Home() {
               { label: "Atk Down", frames: isoAttackDownFrames },
               { label: "Atk Up", frames: isoAttackUpFrames },
               { label: "Atk Side", frames: isoAttackSideFrames },
+              { label: "Idle", frames: isoIdleFrames },
             ]).map(({ label, frames }) => (
               <div key={label}>
                 <h4 style={{ marginBottom: "0.5rem", color: "var(--text-secondary)", fontSize: "0.85rem" }}>{label} Frames</h4>
@@ -2428,6 +2480,7 @@ export default function Home() {
                   attackDownFrames={isoAttackDownFrames}
                   attackUpFrames={isoAttackUpFrames}
                   attackSideFrames={isoAttackSideFrames}
+                  idleFrames={isoIdleFrames}
                   fps={fps}
                   mapUrl={isometricMapUrl}
                 />
@@ -2498,6 +2551,9 @@ export default function Home() {
               setBackgroundMode("default");
               setCustomBackgroundLayers({ layer1Url: null, layer2Url: null, layer3Url: null });
               setIsometricMapUrl(null);
+              setIsoIdleUrl(null);
+              setIsoIdleBgUrl(null);
+              setIsoIdleFrames([]);
               setIsoAttackDownUrl(null);
               setIsoAttackUpUrl(null);
               setIsoAttackSideUrl(null);

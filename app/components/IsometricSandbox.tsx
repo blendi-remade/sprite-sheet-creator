@@ -24,6 +24,7 @@ interface IsometricSandboxProps {
   attackDownFrames: Frame[];
   attackUpFrames: Frame[];
   attackSideFrames: Frame[];
+  idleFrames: Frame[];
   fps: number;
   mapUrl?: string | null;
 }
@@ -38,6 +39,7 @@ export default function IsometricSandbox({
   attackDownFrames,
   attackUpFrames,
   attackSideFrames,
+  idleFrames,
   fps,
   mapUrl,
 }: IsometricSandboxProps) {
@@ -53,6 +55,8 @@ export default function IsometricSandbox({
     walkFrameTime: 0,
     attackFrameIndex: 0,
     attackFrameTime: 0,
+    idleFrameIndex: 0,
+    idleFrameTime: 0,
   });
   const keysPressed = useRef<Set<string>>(new Set());
   const animationRef = useRef<number>(0);
@@ -72,6 +76,10 @@ export default function IsometricSandbox({
   const atkDownFrameDataRef = useRef<Frame[]>([]);
   const atkUpFrameDataRef = useRef<Frame[]>([]);
   const atkSideFrameDataRef = useRef<Frame[]>([]);
+
+  // Idle sprite images
+  const idleImagesRef = useRef<HTMLImageElement[]>([]);
+  const idleFrameDataRef = useRef<Frame[]>([]);
 
   // Map image
   const mapImageRef = useRef<HTMLImageElement | null>(null);
@@ -129,6 +137,11 @@ export default function IsometricSandbox({
   useEffect(() => {
     if (attackSideFrames.length > 0) loadFrames(attackSideFrames, atkSideImagesRef, atkSideFrameDataRef);
   }, [attackSideFrames, loadFrames]);
+
+  // Load idle sprites
+  useEffect(() => {
+    if (idleFrames.length > 0) loadFrames(idleFrames, idleImagesRef, idleFrameDataRef);
+  }, [idleFrames, loadFrames]);
 
   // Load map image
   useEffect(() => {
@@ -293,6 +306,17 @@ export default function IsometricSandbox({
       }
     }
 
+    // Idle animation — plays when standing still
+    const idleImages = idleImagesRef.current;
+    if (!state.isWalking && !state.isAttacking && idleImages.length > 0) {
+      state.idleFrameTime += deltaTime;
+      const idleFrameDuration = 1 / (currentFps * 0.5); // Slower for subtle breathing
+      if (state.idleFrameTime >= idleFrameDuration) {
+        state.idleFrameTime -= idleFrameDuration;
+        state.idleFrameIndex = (state.idleFrameIndex + 1) % idleImages.length;
+      }
+    }
+
     // Determine which sprite to draw (attack > walk > idle)
     let currentImg: HTMLImageElement | null = null;
     let currentFrame: Frame | null = null;
@@ -305,12 +329,25 @@ export default function IsometricSandbox({
         currentImg = images[idx];
         currentFrame = frameData[idx] || null;
       }
-    } else {
+    } else if (state.isWalking) {
       const { images, frameData } = getWalkAssets(state.direction);
       if (images.length > 0) {
         const idx = state.walkFrameIndex % images.length;
         currentImg = images[idx];
         currentFrame = frameData[idx] || null;
+      }
+    } else if (idleImages.length > 0) {
+      // Idle animation
+      const idleFrameData = idleFrameDataRef.current;
+      const idx = state.idleFrameIndex % idleImages.length;
+      currentImg = idleImages[idx];
+      currentFrame = idleFrameData[idx] || null;
+    } else {
+      // Fallback: static walk-down frame 0
+      const { images, frameData } = getWalkAssets("down");
+      if (images.length > 0) {
+        currentImg = images[0];
+        currentFrame = frameData[0] || null;
       }
     }
 
@@ -319,7 +356,12 @@ export default function IsometricSandbox({
       const targetContentHeight = 84; // ~1.5x original size
       const referenceData = walkDownFrameDataRef.current.length > 0 ? walkDownFrameDataRef.current[0] : currentFrame;
       const referenceContentHeight = referenceData.contentBounds.height;
-      const scale = targetContentHeight / referenceContentHeight;
+      const baseScale = targetContentHeight / referenceContentHeight;
+
+      // Boost only side attack frames — landscape aspect ratio causes AI to render characters smaller
+      // Up/down attacks use portrait (9:16) so they don't need boosting
+      const isSideAttack = state.isAttacking && (state.direction === "left" || state.direction === "right");
+      const scale = baseScale * (isSideAttack ? 1.45 : 1.0);
 
       const drawWidth = currentImg.width * scale;
       const drawHeight = currentImg.height * scale;
