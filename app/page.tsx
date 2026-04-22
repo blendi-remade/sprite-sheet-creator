@@ -6,6 +6,14 @@ import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react"
 const PixiSandbox = lazy(() => import("./components/PixiSandbox"));
 const IsometricSandbox = lazy(() => import("./components/IsometricSandbox"));
 
+// Scale defaults kept in sync with the sandbox components
+const DEFAULT_SIDE_SCROLLER_SCALES = { walk: 1, jump: 1, attack: 1.35, idle: 1 };
+const DEFAULT_ISOMETRIC_SCALES = {
+  walkDown: 1, walkUp: 1, walkSide: 1,
+  attackDown: 1, attackUp: 1, attackSide: 1.45,
+  idle: 1,
+};
+
 // Fal Logo SVG component
 const FalLogo = ({ className = "", size = 32 }: { className?: string; size?: number }) => (
   <svg 
@@ -27,6 +35,8 @@ const FalSpinner = ({ size = 48 }: { size?: number }) => (
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 type GameMode = "side-scroller" | "isometric";
+type ImageModel = "nano-banana-pro" | "gpt-image-2";
+type GptImageQuality = "low" | "medium" | "high";
 
 interface BoundingBox {
   x: number;
@@ -87,6 +97,21 @@ export default function Home() {
 
   // Game mode: side-scroller or isometric
   const [gameMode, setGameMode] = useState<GameMode>("side-scroller");
+
+  // Image model: global selection applied to every generation call
+  const [imageModel, setImageModel] = useState<ImageModel>("nano-banana-pro");
+  // Quality tier for gpt-image-2 (ignored by nano-banana-pro)
+  const [gptImageQuality, setGptImageQuality] = useState<GptImageQuality>("high");
+
+  // Per-sprite manual scale multipliers for the sandbox
+  const [sideScrollerScales, setSideScrollerScales] = useState(DEFAULT_SIDE_SCROLLER_SCALES);
+  const [isometricScales, setIsometricScales] = useState(DEFAULT_ISOMETRIC_SCALES);
+
+  // Map zoom multiplier (isometric only)
+  const [isometricMapScale, setIsometricMapScale] = useState(1);
+
+  // Per-layer vertical offsets for side-scroller custom background (px)
+  const [customBgLayerOffsets, setCustomBgLayerOffsets] = useState<[number, number, number]>([0, 0, 0]);
 
   // Step 1: Character generation
   const [characterInputMode, setCharacterInputMode] = useState<"text" | "image">("text");
@@ -441,8 +466,8 @@ export default function Home() {
 
     try {
       const requestBody = characterInputMode === "image"
-        ? { imageUrl: inputImageUrl, prompt: characterPrompt || undefined }
-        : { prompt: characterPrompt };
+        ? { imageUrl: inputImageUrl, prompt: characterPrompt || undefined, imageModel, gptImageQuality }
+        : { prompt: characterPrompt, imageModel, gptImageQuality };
 
       const response = await fetch("/api/generate-character", {
         method: "POST",
@@ -477,27 +502,27 @@ export default function Home() {
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "walk-down" }),
+            body: JSON.stringify({ characterImageUrl, type: "walk-down", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "walk-up" }),
+            body: JSON.stringify({ characterImageUrl, type: "walk-up", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "walk-side" }),
+            body: JSON.stringify({ characterImageUrl, type: "walk-side", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "attack-down" }),
+            body: JSON.stringify({ characterImageUrl, type: "attack-down", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "idle-iso" }),
+            body: JSON.stringify({ characterImageUrl, type: "idle-iso", imageModel, gptImageQuality }),
           }),
         ]);
 
@@ -526,12 +551,12 @@ export default function Home() {
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "attack-up", referenceImageUrls: [atkDownData.imageUrl] }),
+            body: JSON.stringify({ characterImageUrl, type: "attack-up", referenceImageUrls: [atkDownData.imageUrl], imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "attack-side", referenceImageUrls: [atkDownData.imageUrl] }),
+            body: JSON.stringify({ characterImageUrl, type: "attack-side", referenceImageUrls: [atkDownData.imageUrl], imageModel, gptImageQuality }),
           }),
         ]);
 
@@ -549,22 +574,22 @@ export default function Home() {
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "walk" }),
+            body: JSON.stringify({ characterImageUrl, type: "walk", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "jump" }),
+            body: JSON.stringify({ characterImageUrl, type: "jump", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "attack" }),
+            body: JSON.stringify({ characterImageUrl, type: "attack", imageModel, gptImageQuality }),
           }),
           fetch("/api/generate-sprite-sheet", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ characterImageUrl, type: "idle" }),
+            body: JSON.stringify({ characterImageUrl, type: "idle", imageModel, gptImageQuality }),
           }),
         ]);
 
@@ -625,7 +650,7 @@ export default function Home() {
       const response = await fetch("/api/generate-sprite-sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterImageUrl, type: getSpriteType(type) }),
+        body: JSON.stringify({ characterImageUrl, type: getSpriteType(type), imageModel, gptImageQuality }),
       });
 
       const data = await response.json();
@@ -665,7 +690,7 @@ export default function Home() {
       const response = await fetch("/api/generate-sprite-sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterImageUrl, type: dir, referenceImageUrls: refUrls }),
+        body: JSON.stringify({ characterImageUrl, type: dir, referenceImageUrls: refUrls, imageModel, gptImageQuality }),
       });
 
       const data = await response.json();
@@ -753,6 +778,8 @@ export default function Home() {
         body: JSON.stringify({
           characterImageUrl,
           characterPrompt: characterPrompt || "pixel art game character",
+          imageModel,
+          gptImageQuality,
         }),
       });
 
@@ -789,6 +816,8 @@ export default function Home() {
           characterImageUrl,
           characterPrompt: characterPrompt || "pixel art game character",
           mode: "isometric",
+          imageModel,
+          gptImageQuality,
         }),
       });
 
@@ -823,6 +852,8 @@ export default function Home() {
           characterPrompt,
           regenerateLayer: layerNumber,
           existingLayers: customBackgroundLayers,
+          imageModel,
+          gptImageQuality,
         }),
       });
 
@@ -1352,6 +1383,74 @@ export default function Home() {
             Generate Character
           </h2>
 
+          {/* Image model toggle — segmented control */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-tertiary)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Image Model</label>
+            <div style={{ display: "inline-flex", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-color)" }}>
+              <button
+                onClick={() => setImageModel("nano-banana-pro")}
+                style={{
+                  padding: "0.5rem 1.25rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  background: imageModel === "nano-banana-pro" ? "var(--fal-purple-deep)" : "var(--bg-secondary)",
+                  color: imageModel === "nano-banana-pro" ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                Nano Banana Pro
+              </button>
+              <button
+                onClick={() => setImageModel("gpt-image-2")}
+                style={{
+                  padding: "0.5rem 1.25rem",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  border: "none",
+                  borderLeft: "1px solid var(--border-color)",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  background: imageModel === "gpt-image-2" ? "var(--fal-purple-deep)" : "var(--bg-secondary)",
+                  color: imageModel === "gpt-image-2" ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                GPT-Image-2
+              </button>
+            </div>
+
+            {imageModel === "gpt-image-2" && (
+              <div style={{ marginTop: "0.75rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-tertiary)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Quality</label>
+                <select
+                  value={gptImageQuality}
+                  onChange={(e) => setGptImageQuality(e.target.value as GptImageQuality)}
+                  style={{
+                    padding: "0.5rem 2.25rem 0.5rem 0.75rem",
+                    fontFamily: "inherit",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    minWidth: "160px",
+                    outline: "none",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    MozAppearance: "none",
+                    background: "var(--bg-secondary) url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.6)' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") no-repeat right 0.85rem center",
+                  }}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* Game mode toggle — segmented control */}
           <div style={{ marginBottom: "1.5rem" }}>
             <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-tertiary)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Game Style</label>
@@ -1670,7 +1769,7 @@ export default function Home() {
                       if (!characterImageUrl) return;
                       setRegeneratingSpriteSheet("idle-iso");
                       try {
-                        const res = await fetch("/api/generate-sprite-sheet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterImageUrl, type: "idle-iso" }) });
+                        const res = await fetch("/api/generate-sprite-sheet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterImageUrl, type: "idle-iso", imageModel, gptImageQuality }) });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error);
                         setIsoIdleUrl(data.imageUrl);
@@ -2483,6 +2582,8 @@ export default function Home() {
                   idleFrames={isoIdleFrames}
                   fps={fps}
                   mapUrl={isometricMapUrl}
+                  spriteScales={isometricScales}
+                  mapScale={isometricMapScale}
                 />
               ) : (
                 <PixiSandbox
@@ -2492,6 +2593,8 @@ export default function Home() {
                   idleFrames={idleExtractedFrames}
                   fps={fps}
                   customBackgroundLayers={backgroundMode === "custom" ? customBackgroundLayers : undefined}
+                  spriteScales={sideScrollerScales}
+                  customBgLayerOffsets={customBgLayerOffsets}
                 />
               )}
             </Suspense>
@@ -2520,6 +2623,228 @@ export default function Home() {
                 value={fps}
                 onChange={(e) => setFps(parseInt(e.target.value))}
               />
+            </div>
+          </div>
+
+          {/* Custom Background Layer Offsets (side-scroller only, when layers exist) */}
+          {gameMode === "side-scroller" && backgroundMode === "custom" && customBackgroundLayers.layer1Url && (
+            <div style={{
+              marginTop: "1.5rem",
+              padding: "1rem 1.25rem",
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: "8px",
+            }}>
+              <div style={{
+                fontSize: "0.8rem",
+                color: "var(--text-tertiary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "0.75rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <span>Layer Positions</span>
+                <button
+                  onClick={() => setCustomBgLayerOffsets([0, 0, 0])}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-secondary)",
+                    fontSize: "0.7rem",
+                    padding: "0.2rem 0.5rem",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    textTransform: "none",
+                    letterSpacing: 0,
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "0.75rem 1.25rem",
+              }}>
+                {([
+                  ["Layer 1 (Sky)", 0],
+                  ["Layer 2 (Mid)", 1],
+                  ["Layer 3 (Front)", 2],
+                ] as const).map(([label, idx]) => {
+                  const value = customBgLayerOffsets[idx];
+                  return (
+                    <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <div style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        fontSize: "0.8rem",
+                      }}>
+                        <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+                        <span style={{ color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                          {value > 0 ? `+${value}` : value} px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        className="fps-slider"
+                        style={{ width: "100%", accentColor: "var(--fal-purple-light)" }}
+                        min={-200}
+                        max={200}
+                        step={1}
+                        value={value}
+                        onChange={(e) => {
+                          const next = parseInt(e.target.value);
+                          setCustomBgLayerOffsets((prev) => {
+                            const copy = [...prev] as [number, number, number];
+                            copy[idx] = next;
+                            return copy;
+                          });
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Sprite Size controls */}
+          <div style={{
+            marginTop: "1.5rem",
+            padding: "1rem 1.25rem",
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "8px",
+          }}>
+            <div style={{
+              fontSize: "0.8rem",
+              color: "var(--text-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "0.75rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <span>Sprite Sizes</span>
+              <button
+                onClick={() => {
+                  if (gameMode === "isometric") {
+                    setIsometricScales(DEFAULT_ISOMETRIC_SCALES);
+                    setIsometricMapScale(1);
+                  } else {
+                    setSideScrollerScales(DEFAULT_SIDE_SCROLLER_SCALES);
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.7rem",
+                  padding: "0.2rem 0.5rem",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  textTransform: "none",
+                  letterSpacing: 0,
+                }}
+              >
+                Reset
+              </button>
+            </div>
+            {gameMode === "isometric" && (
+              <div style={{
+                marginBottom: "1rem",
+                paddingBottom: "1rem",
+                borderBottom: "1px solid var(--border-color)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  fontSize: "0.8rem",
+                }}>
+                  <span style={{ color: "var(--text-secondary)" }}>Map Size</span>
+                  <span style={{ color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                    {isometricMapScale.toFixed(2)}×
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  className="fps-slider"
+                  style={{ width: "100%", accentColor: "var(--fal-purple-light)" }}
+                  min={0.5}
+                  max={3}
+                  step={0.05}
+                  value={isometricMapScale}
+                  onChange={(e) => setIsometricMapScale(parseFloat(e.target.value))}
+                />
+              </div>
+            )}
+
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "0.75rem 1.25rem",
+            }}>
+              {(gameMode === "side-scroller"
+                ? ([
+                    ["Walk", "walk"],
+                    ["Jump", "jump"],
+                    ["Attack", "attack"],
+                    ["Idle", "idle"],
+                  ] as const)
+                : ([
+                    ["Walk Down", "walkDown"],
+                    ["Walk Up", "walkUp"],
+                    ["Walk Side", "walkSide"],
+                    ["Attack Down", "attackDown"],
+                    ["Attack Up", "attackUp"],
+                    ["Attack Side", "attackSide"],
+                    ["Idle", "idle"],
+                  ] as const)
+              ).map(([label, key]) => {
+                const value = gameMode === "side-scroller"
+                  ? sideScrollerScales[key as keyof typeof sideScrollerScales]
+                  : isometricScales[key as keyof typeof isometricScales];
+                return (
+                  <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      fontSize: "0.8rem",
+                    }}>
+                      <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+                      <span style={{ color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                        {value.toFixed(2)}×
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      className="fps-slider"
+                      style={{ width: "100%", accentColor: "var(--fal-purple-light)" }}
+                      min={0.5}
+                      max={2.5}
+                      step={0.05}
+                      value={value}
+                      onChange={(e) => {
+                        const next = parseFloat(e.target.value);
+                        if (gameMode === "side-scroller") {
+                          setSideScrollerScales((prev) => ({ ...prev, [key]: next }));
+                        } else {
+                          setIsometricScales((prev) => ({ ...prev, [key]: next }));
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 

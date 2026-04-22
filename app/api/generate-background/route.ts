@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import { NextRequest, NextResponse } from "next/server";
+import { generateImage, ImageModel, AspectRatio, GptImageQuality } from "../../lib/generate-image";
 
 // Configure fal client with API key from environment
 fal.config({
@@ -54,34 +55,13 @@ This is a single large continuous map image (NOT tiled, NOT a tileset). It shoul
 Use detailed 32-bit pixel art style. Make it colorful and inviting. Fill the entire image with map content - no empty borders.`;
 
 async function generateLayer(
+  model: ImageModel,
   prompt: string,
   imageUrls: string[],
-  aspectRatio: string = "21:9"
+  aspectRatio: AspectRatio = "21:9",
+  gptImageQuality?: GptImageQuality
 ): Promise<{ url: string; width: number; height: number }> {
-  const result = await fal.subscribe("fal-ai/nano-banana-pro/edit", {
-    input: {
-      prompt,
-      image_urls: imageUrls,
-      num_images: 1,
-      aspect_ratio: aspectRatio,
-      output_format: "png",
-      resolution: "1K",
-    },
-  });
-
-  const data = result.data as {
-    images: Array<{ url: string; width: number; height: number }>;
-  };
-
-  if (!data.images || data.images.length === 0) {
-    throw new Error("No image generated");
-  }
-
-  return {
-    url: data.images[0].url,
-    width: data.images[0].width,
-    height: data.images[0].height,
-  };
+  return generateImage({ model, prompt, imageUrls, aspectRatio, gptImageQuality });
 }
 
 async function removeBackground(
@@ -116,7 +96,15 @@ export async function POST(request: NextRequest) {
       mode,             // Optional: "side-scroller" | "isometric"
       regenerateLayer,  // Optional: 1, 2, or 3 to regenerate only that layer
       existingLayers,   // Optional: { layer1Url, layer2Url, layer3Url } for single layer regen
+      imageModel,
+      gptImageQuality,
     } = await request.json();
+
+    const model: ImageModel = imageModel === "gpt-image-2" ? "gpt-image-2" : "nano-banana-pro";
+    const quality: GptImageQuality | undefined =
+      gptImageQuality === "low" || gptImageQuality === "medium" || gptImageQuality === "high"
+        ? gptImageQuality
+        : undefined;
 
     if (!characterImageUrl || !characterPrompt) {
       return NextResponse.json(
@@ -129,9 +117,11 @@ export async function POST(request: NextRequest) {
     if (mode === "isometric") {
       console.log("Generating isometric map...");
       const map = await generateLayer(
+        model,
         ISOMETRIC_MAP_PROMPT(characterPrompt),
         [characterImageUrl],
-        "1:1"
+        "1:1",
+        quality
       );
       return NextResponse.json({
         mapUrl: map.url,
@@ -145,9 +135,11 @@ export async function POST(request: NextRequest) {
       if (regenerateLayer === 1) {
         console.log("Regenerating layer 1 (sky/background)...");
         const layer1 = await generateLayer(
+          model,
           LAYER1_PROMPT(characterPrompt),
           [characterImageUrl],
-          "21:9"
+          "21:9",
+          quality
         );
         return NextResponse.json({
           layer1Url: layer1.url,
@@ -159,9 +151,11 @@ export async function POST(request: NextRequest) {
       } else if (regenerateLayer === 2) {
         console.log("Regenerating layer 2 (midground)...");
         const layer2Raw = await generateLayer(
+          model,
           LAYER2_PROMPT,
           [characterImageUrl, existingLayers.layer1Url],
-          "21:9"
+          "21:9",
+          quality
         );
         console.log("Removing background from layer 2...");
         const layer2 = await removeBackground(layer2Raw.url);
@@ -175,9 +169,11 @@ export async function POST(request: NextRequest) {
       } else if (regenerateLayer === 3) {
         console.log("Regenerating layer 3 (foreground)...");
         const layer3Raw = await generateLayer(
+          model,
           LAYER3_PROMPT,
           [characterImageUrl, existingLayers.layer1Url, existingLayers.layer2Url],
-          "21:9"
+          "21:9",
+          quality
         );
         console.log("Removing background from layer 3...");
         const layer3 = await removeBackground(layer3Raw.url);
@@ -195,17 +191,21 @@ export async function POST(request: NextRequest) {
     // Layer 1: Sky/Background (furthest)
     console.log("Generating layer 1 (sky/background)...");
     const layer1 = await generateLayer(
+      model,
       LAYER1_PROMPT(characterPrompt),
       [characterImageUrl],
-      "21:9"
+      "21:9",
+      quality
     );
 
     // Layer 2: Midground - needs character + layer 1 as reference
     console.log("Generating layer 2 (midground)...");
     const layer2Raw = await generateLayer(
+      model,
       LAYER2_PROMPT,
       [characterImageUrl, layer1.url],
-      "21:9"
+      "21:9",
+      quality
     );
 
     // Remove background from layer 2
@@ -215,9 +215,11 @@ export async function POST(request: NextRequest) {
     // Layer 3: Foreground - needs character + layer 1 + layer 2 as reference
     console.log("Generating layer 3 (foreground)...");
     const layer3Raw = await generateLayer(
+      model,
       LAYER3_PROMPT,
       [characterImageUrl, layer1.url, layer2.url],
-      "21:9"
+      "21:9",
+      quality
     );
 
     // Remove background from layer 3

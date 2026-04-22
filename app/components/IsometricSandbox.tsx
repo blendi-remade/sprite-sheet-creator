@@ -16,6 +16,26 @@ interface Frame {
   contentBounds: BoundingBox;
 }
 
+export interface IsometricScales {
+  walkDown: number;
+  walkUp: number;
+  walkSide: number;
+  attackDown: number;
+  attackUp: number;
+  attackSide: number;
+  idle: number;
+}
+
+export const DEFAULT_ISOMETRIC_SCALES: IsometricScales = {
+  walkDown: 1,
+  walkUp: 1,
+  walkSide: 1,
+  attackDown: 1,
+  attackUp: 1,
+  attackSide: 1.45,
+  idle: 1,
+};
+
 interface IsometricSandboxProps {
   walkDownFrames: Frame[];
   walkUpFrames: Frame[];
@@ -27,6 +47,8 @@ interface IsometricSandboxProps {
   idleFrames: Frame[];
   fps: number;
   mapUrl?: string | null;
+  spriteScales?: IsometricScales;
+  mapScale?: number;
 }
 
 type Direction = "down" | "up" | "left" | "right";
@@ -42,7 +64,14 @@ export default function IsometricSandbox({
   idleFrames,
   fps,
   mapUrl,
+  spriteScales,
+  mapScale = 1,
 }: IsometricSandboxProps) {
+  const scales = spriteScales ?? DEFAULT_ISOMETRIC_SCALES;
+  const scalesRef = useRef(scales);
+  scalesRef.current = scales;
+  const mapScaleRef = useRef(mapScale);
+  mapScaleRef.current = mapScale;
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const characterState = useRef({
@@ -236,10 +265,12 @@ export default function IsometricSandbox({
 
     state.isWalking = isMoving;
 
-    // Map bounds
+    // Map bounds (world coordinates live in scaled-pixel space so the
+    // character's reachable area grows/shrinks with the map)
     const mapImg = mapImageRef.current;
-    const mapW = mapImg?.naturalWidth || VIEWPORT_WIDTH;
-    const mapH = mapImg?.naturalHeight || VIEWPORT_HEIGHT;
+    const currentMapScale = mapScaleRef.current;
+    const mapW = (mapImg?.naturalWidth || VIEWPORT_WIDTH) * currentMapScale;
+    const mapH = (mapImg?.naturalHeight || VIEWPORT_HEIGHT) * currentMapScale;
     state.worldX = Math.max(20, Math.min(mapW - 20, state.worldX));
     state.worldY = Math.max(20, Math.min(mapH - 20, state.worldY));
 
@@ -251,9 +282,9 @@ export default function IsometricSandbox({
     if (mapW < VIEWPORT_WIDTH) cameraX = -(VIEWPORT_WIDTH - mapW) / 2;
     if (mapH < VIEWPORT_HEIGHT) cameraY = -(VIEWPORT_HEIGHT - mapH) / 2;
 
-    // Draw map at native resolution
+    // Draw map at scaled resolution
     if (mapLoadedRef.current && mapImg) {
-      ctx.drawImage(mapImg, -cameraX, -cameraY);
+      ctx.drawImage(mapImg, -cameraX, -cameraY, mapW, mapH);
     } else {
       ctx.fillStyle = "#2d5a27";
       ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
@@ -358,10 +389,25 @@ export default function IsometricSandbox({
       const referenceContentHeight = referenceData.contentBounds.height;
       const baseScale = targetContentHeight / referenceContentHeight;
 
-      // Boost only side attack frames — landscape aspect ratio causes AI to render characters smaller
-      // Up/down attacks use portrait (9:16) so they don't need boosting
-      const isSideAttack = state.isAttacking && (state.direction === "left" || state.direction === "right");
-      const scale = baseScale * (isSideAttack ? 1.45 : 1.0);
+      // Per-sprite scale multiplier (user-adjustable in the sandbox UI)
+      const isSide = state.direction === "left" || state.direction === "right";
+      let multiplier: number;
+      if (state.isAttacking) {
+        multiplier = isSide
+          ? scalesRef.current.attackSide
+          : state.direction === "up"
+          ? scalesRef.current.attackUp
+          : scalesRef.current.attackDown;
+      } else if (state.isWalking) {
+        multiplier = isSide
+          ? scalesRef.current.walkSide
+          : state.direction === "up"
+          ? scalesRef.current.walkUp
+          : scalesRef.current.walkDown;
+      } else {
+        multiplier = scalesRef.current.idle;
+      }
+      const scale = baseScale * multiplier;
 
       const drawWidth = currentImg.width * scale;
       const drawHeight = currentImg.height * scale;
@@ -417,8 +463,9 @@ export default function IsometricSandbox({
     canvasRef.current = canvas;
 
     const mapImg = mapImageRef.current;
-    characterState.current.worldX = mapImg ? mapImg.naturalWidth / 2 : VIEWPORT_WIDTH / 2;
-    characterState.current.worldY = mapImg ? mapImg.naturalHeight / 2 : VIEWPORT_HEIGHT / 2;
+    const initialMapScale = mapScaleRef.current;
+    characterState.current.worldX = mapImg ? (mapImg.naturalWidth * initialMapScale) / 2 : VIEWPORT_WIDTH / 2;
+    characterState.current.worldY = mapImg ? (mapImg.naturalHeight * initialMapScale) / 2 : VIEWPORT_HEIGHT / 2;
     characterState.current.direction = "down";
     characterState.current.walkFrameIndex = 0;
     characterState.current.walkFrameTime = 0;

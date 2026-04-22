@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import { NextRequest, NextResponse } from "next/server";
+import { generateImage, ImageModel, GptImageQuality } from "../../lib/generate-image";
 
 // Configure fal client with API key from environment
 fal.config({
@@ -22,7 +23,12 @@ Maintain the character's key features, colors, and identity while converting to 
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, imageUrl } = await request.json();
+    const { prompt, imageUrl, imageModel, gptImageQuality } = await request.json();
+    const model: ImageModel = imageModel === "gpt-image-2" ? "gpt-image-2" : "nano-banana-pro";
+    const quality: GptImageQuality | undefined =
+      gptImageQuality === "low" || gptImageQuality === "medium" || gptImageQuality === "high"
+        ? gptImageQuality
+        : undefined;
 
     // Image-to-image mode: convert uploaded image to pixel art
     if (imageUrl) {
@@ -30,32 +36,18 @@ export async function POST(request: NextRequest) {
         ? `${prompt}. ${IMAGE_TO_PIXEL_PROMPT}`
         : IMAGE_TO_PIXEL_PROMPT;
 
-      const result = await fal.subscribe("fal-ai/nano-banana-pro/edit", {
-        input: {
-          prompt: fullPrompt,
-          image_urls: [imageUrl],
-          num_images: 1,
-          aspect_ratio: "1:1",
-          output_format: "png",
-          resolution: "1K",
-        },
+      const image = await generateImage({
+        model,
+        prompt: fullPrompt,
+        imageUrls: [imageUrl],
+        aspectRatio: "1:1",
+        gptImageQuality: quality,
       });
 
-      const data = result.data as {
-        images: Array<{ url: string; width: number; height: number }>;
-      };
-
-      if (!data.images || data.images.length === 0) {
-        return NextResponse.json(
-          { error: "No image generated" },
-          { status: 500 }
-        );
-      }
-
       return NextResponse.json({
-        imageUrl: data.images[0].url,
-        width: data.images[0].width,
-        height: data.images[0].height,
+        imageUrl: image.url,
+        width: image.width,
+        height: image.height,
       });
     }
 
@@ -69,31 +61,17 @@ export async function POST(request: NextRequest) {
 
     const fullPrompt = `${prompt}. ${CHARACTER_STYLE_PROMPT}`;
 
-    const result = await fal.subscribe("fal-ai/nano-banana-pro", {
-      input: {
-        prompt: fullPrompt,
-        num_images: 1,
-        aspect_ratio: "1:1",
-        output_format: "png",
-        resolution: "1K",
-      },
+    const image = await generateImage({
+      model,
+      prompt: fullPrompt,
+      aspectRatio: "1:1",
+      gptImageQuality: quality,
     });
 
-    const data = result.data as {
-      images: Array<{ url: string; width: number; height: number }>;
-    };
-
-    if (!data.images || data.images.length === 0) {
-      return NextResponse.json(
-        { error: "No image generated" },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
-      imageUrl: data.images[0].url,
-      width: data.images[0].width,
-      height: data.images[0].height,
+      imageUrl: image.url,
+      width: image.width,
+      height: image.height,
     });
   } catch (error: unknown) {
     console.error("Error generating character:", error);

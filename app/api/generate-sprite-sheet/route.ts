@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import { NextRequest, NextResponse } from "next/server";
+import { generateImage, ImageModel, AspectRatio, GptImageQuality } from "../../lib/generate-image";
 
 // Configure fal client with API key from environment
 fal.config({
@@ -200,7 +201,30 @@ const PROMPTS: Record<SpriteType, string> = {
   "idle-iso": IDLE_ISO_SPRITE_PROMPT,
 };
 
-const ASPECT_RATIOS: Record<SpriteType, string> = {
+// GPT Image 2 tends to render the side-scroller walk character facing the
+// wrong direction with the default prompt. Override just that sprite type
+// with viewer-space language and a concrete classic-platformer reference.
+const GPT_IMAGE_2_WALK_SPRITE_PROMPT = `Create a 4-frame pixel art walk cycle sprite sheet of this character.
+
+Character orientation (critical): The character is shown in SIDE PROFILE, with their face, chest, and front foot pointing toward the RIGHT edge of the image. The character's back is on the LEFT side of the image. This is the same side-profile orientation used in classic 2D platformers like Super Mario Bros or Mega Man moving rightward across the screen.
+
+Arrange the 4 frames in a 2x2 grid on white background.
+
+Top row (frames 1-2):
+Frame 1 (top-left): Front leg (right leg) extended forward toward the right edge of the image, back leg extended behind toward the left edge
+Frame 2 (top-right): Legs close together, passing pose
+
+Bottom row (frames 3-4):
+Frame 3 (bottom-left): Opposite stride — back leg (left leg) now forward toward the right edge
+Frame 4 (bottom-right): Legs close together, passing pose
+
+Use detailed 32-bit pixel art style with proper shading and highlights. Same character design in all frames. All 4 frames must show the character from the SAME side profile angle, facing the RIGHT edge of the image.`;
+
+const GPT_IMAGE_2_PROMPTS: Partial<Record<SpriteType, string>> = {
+  walk: GPT_IMAGE_2_WALK_SPRITE_PROMPT,
+};
+
+const ASPECT_RATIOS: Record<SpriteType, AspectRatio> = {
   walk: "1:1",   // 2x2 grid
   jump: "1:1",   // 2x2 grid
   attack: "21:9", // 2x2 grid - ultra-wide for big spell effects
@@ -216,7 +240,7 @@ const ASPECT_RATIOS: Record<SpriteType, string> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { characterImageUrl, type = "walk", customPrompt, referenceImageUrls } = await request.json();
+    const { characterImageUrl, type = "walk", customPrompt, referenceImageUrls, imageModel, gptImageQuality } = await request.json();
 
     if (!characterImageUrl) {
       return NextResponse.json(
@@ -225,39 +249,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const model: ImageModel = imageModel === "gpt-image-2" ? "gpt-image-2" : "nano-banana-pro";
+    const quality: GptImageQuality | undefined =
+      gptImageQuality === "low" || gptImageQuality === "medium" || gptImageQuality === "high"
+        ? gptImageQuality
+        : undefined;
     const spriteType = (type as SpriteType) || "walk";
-    const prompt = customPrompt || PROMPTS[spriteType] || PROMPTS.walk;
+    const modelSpecificPrompt = model === "gpt-image-2" ? GPT_IMAGE_2_PROMPTS[spriteType] : undefined;
+    const prompt = customPrompt || modelSpecificPrompt || PROMPTS[spriteType] || PROMPTS.walk;
     const aspectRatio = ASPECT_RATIOS[spriteType] || ASPECT_RATIOS.walk;
 
     // Build image_urls: character image + any reference images (e.g. attack-down for consistency)
     const imageUrls = [characterImageUrl, ...(referenceImageUrls || [])];
 
-    const result = await fal.subscribe("fal-ai/nano-banana-pro/edit", {
-      input: {
-        prompt,
-        image_urls: imageUrls,
-        num_images: 1,
-        aspect_ratio: aspectRatio,
-        output_format: "png",
-        resolution: "1K",
-      },
+    const image = await generateImage({
+      model,
+      prompt,
+      imageUrls,
+      aspectRatio,
+      gptImageQuality: quality,
     });
 
-    const data = result.data as {
-      images: Array<{ url: string; width: number; height: number }>;
-    };
-
-    if (!data.images || data.images.length === 0) {
-      return NextResponse.json(
-        { error: "No sprite sheet generated" },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
-      imageUrl: data.images[0].url,
-      width: data.images[0].width,
-      height: data.images[0].height,
+      imageUrl: image.url,
+      width: image.width,
+      height: image.height,
       type: spriteType,
     });
   } catch (error) {

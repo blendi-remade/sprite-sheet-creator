@@ -22,6 +22,24 @@ interface CustomBackgroundLayers {
   layer3Url: string | null;
 }
 
+export interface SideScrollerScales {
+  walk: number;
+  jump: number;
+  attack: number;
+  idle: number;
+}
+
+export const DEFAULT_SIDE_SCROLLER_SCALES: SideScrollerScales = {
+  walk: 1,
+  jump: 1,
+  attack: 1.35,
+  idle: 1,
+};
+
+export type CustomBgLayerOffsets = [number, number, number];
+
+export const DEFAULT_CUSTOM_BG_LAYER_OFFSETS: CustomBgLayerOffsets = [0, 0, 0];
+
 interface PixiSandboxProps {
   walkFrames: Frame[];
   jumpFrames: Frame[];
@@ -29,6 +47,9 @@ interface PixiSandboxProps {
   idleFrames: Frame[];
   fps: number;
   customBackgroundLayers?: CustomBackgroundLayers;
+  spriteScales?: SideScrollerScales;
+  /** Per-layer vertical offset in pixels for custom AI-generated backgrounds. */
+  customBgLayerOffsets?: CustomBgLayerOffsets;
 }
 
 // Default side-scroller parallax layers
@@ -47,7 +68,13 @@ const CUSTOM_PARALLAX_SPEEDS = [0, 0.3, 0.6];
 const JUMP_VELOCITY = -12;
 const GRAVITY = 0.6;
 
-export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idleFrames, fps, customBackgroundLayers }: PixiSandboxProps) {
+export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idleFrames, fps, customBackgroundLayers, spriteScales, customBgLayerOffsets }: PixiSandboxProps) {
+  const scales = spriteScales ?? DEFAULT_SIDE_SCROLLER_SCALES;
+  const scalesRef = useRef(scales);
+  scalesRef.current = scales;
+  const bgOffsets = customBgLayerOffsets ?? DEFAULT_CUSTOM_BG_LAYER_OFFSETS;
+  const bgOffsetsRef = useRef(bgOffsets);
+  bgOffsetsRef.current = bgOffsets;
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const characterState = useRef({
@@ -359,7 +386,10 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idle
           // Calculate scroll offset using the globally clamped camera position
           const offset = clampedCameraX * speed;
 
-          ctx.drawImage(layer, -offset, 0, scaledWidth, WORLD_HEIGHT);
+          // Per-layer vertical offset (user-adjustable to fix alignment issues)
+          const yOffset = bgOffsetsRef.current[index] ?? 0;
+
+          ctx.drawImage(layer, -offset, yOffset, scaledWidth, WORLD_HEIGHT);
         }
       });
     } else if (bgLoadedRef.current && bgLayers.length > 0) {
@@ -487,10 +517,18 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idle
       // Scale based on actual character content, not frame dimensions
       const baseScale = targetContentHeight / referenceContentHeight;
       
-      // Apply scale boost for attack frames - the AI renders characters smaller
-      // to fit spell effects, so we compensate
+      // Per-sprite scale multiplier (user-adjustable in the sandbox UI)
       const isAttackFrame = state.isAttacking && attackImages.length > 0;
-      const scale = baseScale * (isAttackFrame ? 1.35 : 1.0);
+      const isJumpFrame = state.isJumping && jumpImages.length > 0;
+      const isWalkFrame = state.isWalking && !state.isJumping && !state.isAttacking && walkImages.length > 0;
+      const multiplier = isAttackFrame
+        ? scalesRef.current.attack
+        : isJumpFrame
+        ? scalesRef.current.jump
+        : isWalkFrame
+        ? scalesRef.current.walk
+        : scalesRef.current.idle;
+      const scale = baseScale * multiplier;
       
       const drawWidth = currentImg.width * scale;
       const drawHeight = currentImg.height * scale;
