@@ -1,6 +1,6 @@
 # Sprite Sheet Creator
 
-Sprite sheet generator for 2D pixel art characters. Built with [fal.ai](https://fal.ai).
+Sprite sheet generator for 2D pixel art characters and maps. Built with [fal.ai](https://fal.ai).
 
 ## Demo
 
