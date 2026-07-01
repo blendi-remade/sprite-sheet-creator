@@ -38,6 +38,35 @@ Create the closest foreground elements (ground, grass, rocks, platforms - whatev
 Style: Pixel art matching the other images.
 IMPORTANT: Use a transparent background (checkerboard pattern) so this layer can overlay the others.`;
 
+// Nano Banana Lite tends to copy its reference images too literally, making the
+// foreground layer nearly identical to the midground. Override layer 3 with much
+// blunter constraints, and (below) drop the midground from its reference images.
+const NANO_BANANA_LITE_LAYER3_PROMPT = `Create the FOREGROUND layer of a 3-layer parallax background for a side-scrolling pixel art game.
+
+I've sent you images of: 1) the character, 2) the background/sky layer.
+
+STRICT RULES:
+- Draw ONLY a narrow strip of ground along the BOTTOM 25-30% of the image: close-up ground, grass, rocks, or platform edges that fit the character's world.
+- The TOP 70-75% of the image MUST be completely EMPTY and TRANSPARENT (checkerboard pattern). No sky, no buildings, no scenery there.
+- Do NOT redraw or copy buildings, structures, or scenery from the reference images. This layer is only the ground closest to the camera.
+
+Style: Pixel art matching the reference images.
+IMPORTANT: Use a transparent background (checkerboard pattern) everywhere except the bottom ground strip.`;
+
+// Pick the layer-3 prompt and reference images for a given model.
+function getLayer3Config(
+  model: ImageModel,
+  characterImageUrl: string,
+  layer1Url: string,
+  layer2Url: string
+): { prompt: string; imageUrls: string[] } {
+  if (model === "nano-banana-lite") {
+    // Omit layer 2 — lite copies it instead of complementing it.
+    return { prompt: NANO_BANANA_LITE_LAYER3_PROMPT, imageUrls: [characterImageUrl, layer1Url] };
+  }
+  return { prompt: LAYER3_PROMPT, imageUrls: [characterImageUrl, layer1Url, layer2Url] };
+}
+
 const ISOMETRIC_MAP_PROMPT = (characterPrompt: string) =>
   `Create a large, detailed top-down isometric pixel art game world map for a character: "${characterPrompt}". Do not place the character themselves on the map.
 
@@ -168,10 +197,11 @@ export async function POST(request: NextRequest) {
         });
       } else if (regenerateLayer === 3) {
         console.log("Regenerating layer 3 (foreground)...");
+        const layer3Config = getLayer3Config(model, characterImageUrl, existingLayers.layer1Url, existingLayers.layer2Url);
         const layer3Raw = await generateLayer(
           model,
-          LAYER3_PROMPT,
-          [characterImageUrl, existingLayers.layer1Url, existingLayers.layer2Url],
+          layer3Config.prompt,
+          layer3Config.imageUrls,
           "21:9",
           quality
         );
@@ -212,12 +242,14 @@ export async function POST(request: NextRequest) {
     console.log("Removing background from layer 2...");
     const layer2 = await removeBackground(layer2Raw.url);
 
-    // Layer 3: Foreground - needs character + layer 1 + layer 2 as reference
+    // Layer 3: Foreground - needs character + layer 1 (+ layer 2 for models that
+    // complement rather than copy their references) as reference
     console.log("Generating layer 3 (foreground)...");
+    const layer3Config = getLayer3Config(model, characterImageUrl, layer1.url, layer2.url);
     const layer3Raw = await generateLayer(
       model,
-      LAYER3_PROMPT,
-      [characterImageUrl, layer1.url, layer2.url],
+      layer3Config.prompt,
+      layer3Config.imageUrls,
       "21:9",
       quality
     );
