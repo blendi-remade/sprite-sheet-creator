@@ -50,6 +50,10 @@ interface PixiSandboxProps {
   spriteScales?: SideScrollerScales;
   /** Per-layer vertical offset in pixels for custom AI-generated backgrounds. */
   customBgLayerOffsets?: CustomBgLayerOffsets;
+  /** Vertical offset in pixels for the character (positive = down). */
+  characterYOffset?: number;
+  /** Per-layer on/off toggle for custom AI-generated backgrounds. */
+  customBgLayerVisibility?: [boolean, boolean, boolean];
 }
 
 // Default side-scroller parallax layers
@@ -68,13 +72,18 @@ const CUSTOM_PARALLAX_SPEEDS = [0, 0.3, 0.6];
 const JUMP_VELOCITY = -12;
 const GRAVITY = 0.6;
 
-export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idleFrames, fps, customBackgroundLayers, spriteScales, customBgLayerOffsets }: PixiSandboxProps) {
+export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idleFrames, fps, customBackgroundLayers, spriteScales, customBgLayerOffsets, characterYOffset = 0, customBgLayerVisibility }: PixiSandboxProps) {
   const scales = spriteScales ?? DEFAULT_SIDE_SCROLLER_SCALES;
   const scalesRef = useRef(scales);
   scalesRef.current = scales;
   const bgOffsets = customBgLayerOffsets ?? DEFAULT_CUSTOM_BG_LAYER_OFFSETS;
   const bgOffsetsRef = useRef(bgOffsets);
   bgOffsetsRef.current = bgOffsets;
+  const charYOffsetRef = useRef(characterYOffset);
+  charYOffsetRef.current = characterYOffset;
+  const bgVisibility = customBgLayerVisibility ?? [true, true, true];
+  const bgVisibilityRef = useRef(bgVisibility);
+  bgVisibilityRef.current = bgVisibility;
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const characterState = useRef({
@@ -376,6 +385,7 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idle
       const clampedCameraX = Math.max(0, Math.min(maxCameraX === Infinity ? 0 : maxCameraX, cameraX.current));
 
       customBgLayers.forEach((layer, index) => {
+        if (bgVisibilityRef.current[index] === false) return;
         if (layer.complete && layer.naturalWidth > 0) {
           const speed = CUSTOM_PARALLAX_SPEEDS[index] || 0;
 
@@ -541,9 +551,10 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idle
       // timeRef is now in seconds, so multiply by 18 (was 0.3 * 60fps) for same visual speed
       const bob = state.isWalking && !state.isJumping && !state.isAttacking ? Math.sin(timeRef.current * 18) * 2 : 0;
       
-      // Position so feet are at GROUND_Y
-      // drawY is top-left of the sprite, so: drawY + feetY = GROUND_Y
-      const drawY = GROUND_Y - feetY + bob + state.y;
+      // Position so feet are at GROUND_Y (nudged by the user's vertical offset)
+      // drawY is top-left of the sprite, so: drawY + feetY = groundY
+      const groundY = GROUND_Y + charYOffsetRef.current;
+      const drawY = groundY - feetY + bob + state.y;
       
       // Center horizontally based on content center, not frame center
       const contentCenterX = (contentBounds.x + contentBounds.width / 2) * scale;
@@ -553,7 +564,7 @@ export default function PixiSandbox({ walkFrames, jumpFrames, attackFrames, idle
       const shadowScale = Math.max(0.3, 1 + state.y / 100);
       ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * shadowScale})`;
       ctx.beginPath();
-      ctx.ellipse(state.x, GROUND_Y + 2, (contentBounds.width * scale / 3) * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.ellipse(state.x, groundY + 2, (contentBounds.width * scale / 3) * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.save();

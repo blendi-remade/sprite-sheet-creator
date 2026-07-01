@@ -35,7 +35,7 @@ const FalSpinner = ({ size = 48 }: { size?: number }) => (
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 type GameMode = "side-scroller" | "isometric";
-type ImageModel = "nano-banana-pro" | "gpt-image-2";
+type ImageModel = "nano-banana-pro" | "nano-banana-lite" | "gpt-image-2";
 type GptImageQuality = "low" | "medium" | "high";
 
 interface BoundingBox {
@@ -112,6 +112,20 @@ export default function Home() {
 
   // Per-layer vertical offsets for side-scroller custom background (px)
   const [customBgLayerOffsets, setCustomBgLayerOffsets] = useState<[number, number, number]>([0, 0, 0]);
+
+  // Vertical offset for the side-scroller character (px, positive = down)
+  const [characterYOffset, setCharacterYOffset] = useState(0);
+
+  // Per-layer on/off toggle for the side-scroller custom background
+  const [customBgLayerVisibility, setCustomBgLayerVisibility] = useState<[boolean, boolean, boolean]>([true, true, true]);
+
+  const toggleCustomBgLayer = (idx: 0 | 1 | 2) => {
+    setCustomBgLayerVisibility((prev) => {
+      const copy = [...prev] as [boolean, boolean, boolean];
+      copy[idx] = !copy[idx];
+      return copy;
+    });
+  };
 
   // Step 1: Character generation
   const [characterInputMode, setCharacterInputMode] = useState<"text" | "image">("text");
@@ -1387,37 +1401,29 @@ export default function Home() {
           <div style={{ marginBottom: "1.5rem" }}>
             <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-tertiary)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Image Model</label>
             <div style={{ display: "inline-flex", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-color)" }}>
-              <button
-                onClick={() => setImageModel("nano-banana-pro")}
-                style={{
-                  padding: "0.5rem 1.25rem",
-                  fontSize: "0.85rem",
-                  fontWeight: 500,
-                  border: "none",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  background: imageModel === "nano-banana-pro" ? "var(--fal-purple-deep)" : "var(--bg-secondary)",
-                  color: imageModel === "nano-banana-pro" ? "#fff" : "var(--text-secondary)",
-                }}
-              >
-                Nano Banana Pro
-              </button>
-              <button
-                onClick={() => setImageModel("gpt-image-2")}
-                style={{
-                  padding: "0.5rem 1.25rem",
-                  fontSize: "0.85rem",
-                  fontWeight: 500,
-                  border: "none",
-                  borderLeft: "1px solid var(--border-color)",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  background: imageModel === "gpt-image-2" ? "var(--fal-purple-deep)" : "var(--bg-secondary)",
-                  color: imageModel === "gpt-image-2" ? "#fff" : "var(--text-secondary)",
-                }}
-              >
-                GPT-Image-2
-              </button>
+              {([
+                ["nano-banana-pro", "Nano Banana Pro"],
+                ["nano-banana-lite", "Nano Banana Lite"],
+                ["gpt-image-2", "GPT-Image-2"],
+              ] as const).map(([value, label], i) => (
+                <button
+                  key={value}
+                  onClick={() => setImageModel(value)}
+                  style={{
+                    padding: "0.5rem 1.25rem",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    border: "none",
+                    borderLeft: i === 0 ? "none" : "1px solid var(--border-color)",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: imageModel === value ? "var(--fal-purple-deep)" : "var(--bg-secondary)",
+                    color: imageModel === value ? "#fff" : "var(--text-secondary)",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             {imageModel === "gpt-image-2" && (
@@ -2470,7 +2476,7 @@ export default function Home() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "0.75rem" }}>
                         <div>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Layer 1 (Sky)</div>
-                          <img src={customBackgroundLayers.layer1Url} alt="Background layer" style={{ width: "100%", borderRadius: "4px", opacity: regeneratingLayer === 1 ? 0.5 : 1 }} />
+                          <img src={customBackgroundLayers.layer1Url} alt="Background layer" style={{ width: "100%", borderRadius: "4px", opacity: regeneratingLayer === 1 ? 0.5 : customBgLayerVisibility[0] ? 1 : 0.3 }} />
                           <button
                             className="btn btn-secondary"
                             onClick={() => regenerateBackgroundLayer(1)}
@@ -2479,10 +2485,17 @@ export default function Home() {
                           >
                             {regeneratingLayer === 1 ? "..." : "Regen"}
                           </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => toggleCustomBgLayer(0)}
+                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", marginTop: "0.25rem", width: "100%", opacity: customBgLayerVisibility[0] ? 1 : 0.6 }}
+                          >
+                            {customBgLayerVisibility[0] ? "Hide" : "Show"}
+                          </button>
                         </div>
                         <div>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Layer 2 (Mid)</div>
-                          <img src={customBackgroundLayers.layer2Url!} alt="Midground layer" style={{ width: "100%", borderRadius: "4px", background: "#333", opacity: regeneratingLayer === 2 ? 0.5 : 1 }} />
+                          <img src={customBackgroundLayers.layer2Url!} alt="Midground layer" style={{ width: "100%", borderRadius: "4px", background: "#333", opacity: regeneratingLayer === 2 ? 0.5 : customBgLayerVisibility[1] ? 1 : 0.3 }} />
                           <button
                             className="btn btn-secondary"
                             onClick={() => regenerateBackgroundLayer(2)}
@@ -2491,10 +2504,17 @@ export default function Home() {
                           >
                             {regeneratingLayer === 2 ? "..." : "Regen"}
                           </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => toggleCustomBgLayer(1)}
+                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", marginTop: "0.25rem", width: "100%", opacity: customBgLayerVisibility[1] ? 1 : 0.6 }}
+                          >
+                            {customBgLayerVisibility[1] ? "Hide" : "Show"}
+                          </button>
                         </div>
                         <div>
                           <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginBottom: "0.25rem" }}>Layer 3 (Front)</div>
-                          <img src={customBackgroundLayers.layer3Url!} alt="Foreground layer" style={{ width: "100%", borderRadius: "4px", background: "#333", opacity: regeneratingLayer === 3 ? 0.5 : 1 }} />
+                          <img src={customBackgroundLayers.layer3Url!} alt="Foreground layer" style={{ width: "100%", borderRadius: "4px", background: "#333", opacity: regeneratingLayer === 3 ? 0.5 : customBgLayerVisibility[2] ? 1 : 0.3 }} />
                           <button
                             className="btn btn-secondary"
                             onClick={() => regenerateBackgroundLayer(3)}
@@ -2502,6 +2522,13 @@ export default function Home() {
                             style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", marginTop: "0.25rem", width: "100%" }}
                           >
                             {regeneratingLayer === 3 ? "..." : "Regen"}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => toggleCustomBgLayer(2)}
+                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", marginTop: "0.25rem", width: "100%", opacity: customBgLayerVisibility[2] ? 1 : 0.6 }}
+                          >
+                            {customBgLayerVisibility[2] ? "Hide" : "Show"}
                           </button>
                         </div>
                       </div>
@@ -2595,6 +2622,8 @@ export default function Home() {
                   customBackgroundLayers={backgroundMode === "custom" ? customBackgroundLayers : undefined}
                   spriteScales={sideScrollerScales}
                   customBgLayerOffsets={customBgLayerOffsets}
+                  characterYOffset={characterYOffset}
+                  customBgLayerVisibility={customBgLayerVisibility}
                 />
               )}
             </Suspense>
@@ -2737,6 +2766,7 @@ export default function Home() {
                     setIsometricMapScale(1);
                   } else {
                     setSideScrollerScales(DEFAULT_SIDE_SCROLLER_SCALES);
+                    setCharacterYOffset(0);
                   }
                 }}
                 style={{
@@ -2783,6 +2813,39 @@ export default function Home() {
                   step={0.05}
                   value={isometricMapScale}
                   onChange={(e) => setIsometricMapScale(parseFloat(e.target.value))}
+                />
+              </div>
+            )}
+
+            {gameMode === "side-scroller" && (
+              <div style={{
+                marginBottom: "1rem",
+                paddingBottom: "1rem",
+                borderBottom: "1px solid var(--border-color)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem",
+              }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  fontSize: "0.8rem",
+                }}>
+                  <span style={{ color: "var(--text-secondary)" }}>Character Position</span>
+                  <span style={{ color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                    {characterYOffset > 0 ? `+${characterYOffset}` : characterYOffset} px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  className="fps-slider"
+                  style={{ width: "100%", accentColor: "var(--fal-purple-light)" }}
+                  min={-200}
+                  max={200}
+                  step={1}
+                  value={characterYOffset}
+                  onChange={(e) => setCharacterYOffset(parseInt(e.target.value))}
                 />
               </div>
             )}
@@ -2874,7 +2937,9 @@ export default function Home() {
               setCharacterInputMode("text");
               setGameMode("side-scroller");
               setBackgroundMode("default");
+              setCharacterYOffset(0);
               setCustomBackgroundLayers({ layer1Url: null, layer2Url: null, layer3Url: null });
+              setCustomBgLayerVisibility([true, true, true]);
               setIsometricMapUrl(null);
               setIsoIdleUrl(null);
               setIsoIdleBgUrl(null);

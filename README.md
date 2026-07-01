@@ -46,6 +46,7 @@ Sprite sheet generator for 2D pixel art characters and maps. Built with [fal.ai]
 Pick the model once at the top of Step 1 and it applies to every generation in the flow:
 
 - **Nano Banana Pro** (`fal-ai/nano-banana-pro` and `/edit`)
+- **Nano Banana Lite** (`google/nano-banana-lite` and `/edit`)
 - **GPT Image 2** (`openai/gpt-image-2` and `/edit`)
 
 ## Getting Started
@@ -93,5 +94,5 @@ npm run dev
 
 - Next.js 14
 - React 18
-- fal.ai (Nano Banana Pro, GPT Image 2, Bria background removal)
+- fal.ai (Nano Banana Pro, Nano Banana Lite, GPT Image 2, Bria background removal)
 - HTML Canvas

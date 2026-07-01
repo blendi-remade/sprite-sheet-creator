@@ -1,6 +1,6 @@
 import { fal } from "@fal-ai/client";
 import { NextRequest, NextResponse } from "next/server";
-import { generateImage, ImageModel, GptImageQuality } from "../../lib/generate-image";
+import { generateImage, GptImageQuality, normalizeImageModel } from "../../lib/generate-image";
 
 // Configure fal client with API key from environment
 fal.config({
@@ -24,7 +24,7 @@ Maintain the character's key features, colors, and identity while converting to 
 export async function POST(request: NextRequest) {
   try {
     const { prompt, imageUrl, imageModel, gptImageQuality } = await request.json();
-    const model: ImageModel = imageModel === "gpt-image-2" ? "gpt-image-2" : "nano-banana-pro";
+    const model = normalizeImageModel(imageModel);
     const quality: GptImageQuality | undefined =
       gptImageQuality === "low" || gptImageQuality === "medium" || gptImageQuality === "high"
         ? gptImageQuality
